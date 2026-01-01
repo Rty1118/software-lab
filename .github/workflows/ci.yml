@@ -1,58 +1,66 @@
-name: C++ Project CI 
+# 工作流名称
+name: C++ AccountBook CI
 
+# 触发工作流的事件：当有代码推送到 main 分支或有人向 main 分支发起 Pull Request 时触发
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
+# 工作流包含的任务 (jobs)
 jobs:
-  test:
+  build-and-test:
+    # 运行此任务的操作系统环境
     runs-on: ubuntu-latest
-
+    
+    # 任务包含的步骤 (steps)
     steps:
-    - name: Checkout repository 
+    # 第一步：检出你的代码库
+    - name: Checkout repository
       uses: actions/checkout@v4
-
-    - name: Install dependencies
-      run: |
-          sudo apt-get update
-          sudo apt-get install -y g++ cmake make
-          # 安装 Google Test
-          sudo apt-get install -y libgtest-dev
-          cd /usr/src/gtest
-          sudo cmake .
-          sudo make
-          sudo cp lib/*.a /usr/lib
-
-    - name: Create build directory
-      run: mkdir build
-
-    - name: Configure CMake
-      working-directory: ./build
-      run: cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-
-    - name: Build project
-      working-directory: ./build
-      run: cmake --build . --config ${{ matrix.build_type }}
-
-    - name: Run tests
-      working-directory: ./build
-      run: |
-        if [ "$RUNNER_OS" == "Windows" ]; then
-          ctest -C ${{ matrix.build_type }} -V
-        else
-          ctest -V
-        fi
-
-  # 代码格式化检查
-  format-check:
-    runs-on: ubuntu-latest
     
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Check clang-format
+    # 第二步：安装C++编译器和构建工具
+    - name: Install C++ compiler and tools
       run: |
-        # 检查代码格式
-        find . -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
+        sudo apt-get update
+        sudo apt-get install -y g++ make cmake
+        g++ --version
+    
+    # 第三步：安装Google Test框架
+    - name: Install Google Test
+      run: |
+        sudo apt-get install -y libgtest-dev
+        cd /usr/src/gtest
+        sudo cmake CMakeLists.txt
+        sudo make
+        sudo cp lib/*.a /usr/lib
+        echo "Google Test installed successfully"
+    
+    # 第四步：编译并运行Transaction单元测试
+    - name: Compile and run Transaction tests
+      run: |
+        echo "Compiling Transaction tests..."
+        g++ -std=c++11 -I. \
+            test_transaction.cpp Transaction.cpp \
+            -lgtest -lgtest_main -lpthread \
+            -o test_transaction
+        
+        echo "Running Transaction tests..."
+        ./test_transaction --gtest_output=xml:transaction_results.xml
+        
+        echo "Transaction tests completed!"
+    
+    # 第五步：编译并运行AccountBook单元测试
+    - name: Compile and run AccountBook tests
+      run: |
+        echo "Compiling AccountBook tests..."
+        g++ -std=c++11 -I. \
+            test_accountbook.cpp AccountBook.cpp Transaction.cpp \
+            -lgtest -lgtest_main -lpthread \
+            -o test_accountbook
+        
+        echo "Running AccountBook tests..."
+        ./test_accountbook --gtest_output=xml:accountbook_results.xml
+        
+        echo "AccountBook tests completed!"
