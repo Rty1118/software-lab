@@ -1,0 +1,68 @@
+name: C++ CI - Simple
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install -y g++ cmake make
+          # 安装 Google Test
+          sudo apt-get install -y libgtest-dev
+          cd /usr/src/gtest
+          sudo cmake .
+          sudo make
+          sudo cp lib/*.a /usr/lib
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          brew install cmake googletest
+        elif [ "$RUNNER_OS" == "Windows" ]; then
+          choco install cmake -y
+        fi
+
+    - name: Create build directory
+      run: mkdir build
+
+    - name: Configure CMake
+      working-directory: ./build
+      run: cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+
+    - name: Build project
+      working-directory: ./build
+      run: cmake --build . --config ${{ matrix.build_type }}
+
+    - name: Run tests
+      working-directory: ./build
+      run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          ctest -C ${{ matrix.build_type }} -V
+        else
+          ctest -V
+        fi
+
+  # 代码格式化检查
+  format-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Check clang-format
+      run: |
+        # 检查代码格式
+        find . -name "*.cpp" -o -name "*.h" | xargs clang-format --dry-run --Werror
